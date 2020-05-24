@@ -1,45 +1,75 @@
-import { injectable, inject } from 'tsyringe';
-
+import FakeStorageProvider from '@shared/container/providers/StorageProvider/fakes/FakeStorageProvider';
 import AppError from '@shared/errors/AppError';
-import IStorageProvider from '@shared/container/providers/StorageProvider/models/IStorageProvider';
-import IUsersRepository from '../repositories/IUsersRepository';
+import FakeUsersRepository from '../repositories/fakes/FakeUsersRepository';
+import UpdateUserAvatarService from './UpdateUserAvatarService';
 
-import User from '../infra/typeorm/entities/User';
+describe('UpdateUserAvatar', () => {
+  it('should be able to update users avatar', async () => {
+    const fakeUsersRepository = new FakeUsersRepository();
+    const fakeStorageProvider = new FakeStorageProvider();
+    const updateUserAvatar = new UpdateUserAvatarService(
+      fakeUsersRepository,
+      fakeStorageProvider,
+    );
 
-interface IRequest {
-  user_id: string;
-  avatarFilename: string;
-}
+    const user = await fakeUsersRepository.create({
+      name: 'John Doe',
+      email: 'johndoe@example.com',
+      password: '123456',
+    });
 
-@injectable()
-class UpdateUserAvatarService {
-  constructor(
-    @inject('UsersRepository')
-    private usersRepository: IUsersRepository,
+    await updateUserAvatar.execute({
+      user_id: user.id,
+      avatarFilename: 'avatar.jpg',
+    });
 
-    @inject('StorageProvider')
-    private storageProvider: IStorageProvider,
-  ) {}
+    expect(user.avatar).toBe('avatar.jpg');
+  });
 
-  public async execute({ user_id, avatarFilename }: IRequest): Promise<User> {
-    const user = await this.usersRepository.findById(user_id);
+  it('should not be able to update avatar of a non existing user', async () => {
+    const fakeUsersRepository = new FakeUsersRepository();
+    const fakeStorageProvider = new FakeStorageProvider();
+    const updateUserAvatar = new UpdateUserAvatarService(
+      fakeUsersRepository,
+      fakeStorageProvider,
+    );
 
-    if (!user) {
-      throw new AppError('Only authenticated users can change avatar', 401);
-    }
+    expect(
+      updateUserAvatar.execute({
+        user_id: 'non-existing-user',
+        avatarFilename: 'avatar.jpg',
+      }),
+    ).rejects.toBeInstanceOf(AppError);
+  });
 
-    if (user.avatar) {
-      await this.storageProvider.deleteFile(user.avatar);
-    }
+  it('should delete old avatar when users updated', async () => {
+    const fakeUsersRepository = new FakeUsersRepository();
+    const fakeStorageProvider = new FakeStorageProvider();
 
-    const filename = await this.storageProvider.saveFile(avatarFilename);
+    const deleteFile = jest.spyOn(fakeStorageProvider, 'deleteFile');
 
-    user.avatar = filename;
+    const updateUserAvatar = new UpdateUserAvatarService(
+      fakeUsersRepository,
+      fakeStorageProvider,
+    );
 
-    await this.usersRepository.save(user);
+    const user = await fakeUsersRepository.create({
+      name: 'John Doe',
+      email: 'johndoe@example.com',
+      password: '123456',
+    });
 
-    return user;
-  }
-}
+    await updateUserAvatar.execute({
+      user_id: user.id,
+      avatarFilename: 'avatar.jpg',
+    });
 
-export default UpdateUserAvatarService;
+    await updateUserAvatar.execute({
+      user_id: user.id,
+      avatarFilename: 'avatar2.jpg',
+    });
+
+    expect(deleteFile).toHaveBeenCalledWith('avatar.jpg');
+    expect(user.avatar).toBe('avatar2.jpg');
+  });
+});
