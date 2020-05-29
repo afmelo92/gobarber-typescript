@@ -12,7 +12,7 @@ interface IRequest {
 }
 
 @injectable()
-class CreatAppointmentService {
+class CreateAppointmentService {
   constructor(
     @inject('AppointmentsRepository')
     private appointmentsRepository: IAppointmentsRepository,
@@ -26,7 +26,7 @@ class CreatAppointmentService {
     );
 
     if (findAppointmentInSameDate) {
-      throw new AppError('This appointment is already booked');
+      throw new AppError('Appointment already booked');
     }
 
     const appointment = await this.appointmentsRepository.create({
@@ -38,4 +38,4 @@ class CreatAppointmentService {
   }
 }
 
-export default CreatAppointmentService;
+export default CreateAppointmentService;
