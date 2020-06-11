@@ -44,8 +44,6 @@ class ListProviderAppointmentsService {
       );
     }
 
-    console.log('Buscou do banco de dados 1');
-
     await this.cacheProvider.save(cacheKey, appointments);
 
     return appointments;
